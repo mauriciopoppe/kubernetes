@@ -41,6 +41,9 @@ GINKGO_NO_COLOR=${GINKGO_NO_COLOR:-n}
 # If 'y', will rerun failed tests once to give them a second chance.
 GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 
+# If 'y' the command executed will be `dlv exec` instead of `ginkgo`
+E2E_DEBUG=${E2E_DEBUG:-n}
+
 : "${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}"
 : "${KUBE_CONFIG_FILE:="config-test.sh"}"
 
@@ -152,7 +155,18 @@ CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-${KUBE_CONTAINER_RUNTIME:-}}
 # Add path for things like running kubectl binary.
 PATH=$(dirname "${e2e_test}"):"${PATH}"
 export PATH
-"${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
+
+# If the program is invoked with E2E_DEBUG=y we use delve instead.
+# NOTE: for this to work the e2e.test binary has to be compiled with
+# make WHAT=test/e2e/e2e.test GOGCFLAGS="all=-N -l" GOLDFLAGS=""
+program="${ginkgo}"
+program_args="${ginkgo_args[@]}"
+if [[ "${E2E_DEBUG}" == "y" ]]; then
+  program="dlv"
+  program_args=("exec")
+fi
+
+"${program}" "${program_args[@]:+${program_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
   --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
   --host="${KUBE_MASTER_URL}" \
